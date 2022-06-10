@@ -53,27 +53,28 @@ class Song:
 
     @airsonic_song_id.setter
     def airsonic_song_id(self, value):
-        self.airsonic_song_id = value
+        self._airsonic_song_id = value
 
     def __str__(self):
-        return f"name: {self._name}, artist: {self._artist}, album: {self._album}, original_file: {self._original_file}, airsonic_song_id: {self._airsonic_song_id}"
+        return f"name: {self._name}, artist: {self._artist}, album: {self._album}, library_file: {self._airsonic_library_file}, original_file: {self._original_file}, airsonic_song_id: {self._airsonic_song_id}"
 
 
 def canonical_artist(audiofile):
     track_artist = sanitize_filename(audiofile.tag.artist.split(";")[0])
     album_artist = sanitize_filename(audiofile.tag.album_artist.split(";")[0])
 
-    if track_artist != album_artist:
+    # track_artist may be malformed and not split correctly. album_artist is more reliable
+    if album_artist not in track_artist:
         raise ValueError(f"could not determine canonical artist, track_artist = {track_artist}, album_artist = {album_artist}")
 
-    return track_artist
+    return album_artist
 
 # connect to the specified server, returns a libsonic.Connection
 def connect_airsonic(server, port, username, password):
     # We pass in the base url, the username, password, and port number
     # Be sure to use https:// if this is an ssl connection!
-    conn = libsonic.Connection(server , username ,
-                               password , port=port)
+    conn = libsonic.Connection(baseUrl=server, username=username,
+                               password=password , port=port, apiVersion="1.15")
 
     reply = conn.ping()
     if reply:
@@ -83,52 +84,24 @@ def connect_airsonic(server, port, username, password):
 
     return conn
 
-
 # prompts a scan of the media folder, waits for the scan to complete to return
 def scan_media_folders(airsonic_api):
     def scanning():
         status = airsonic_api.getScanStatus()
         return status.get("scanStatus").get("scanning")
 
+    print("initiating airsonic media scan")
     airsonic_api.startScan()
     while(scanning()):
-        time.sleep(5)
-
-
-# def sync(airsonic_api):
-#     print(u'~~~~~Syncing new imports to monthly playlist~~~~~')
-#     scanMediaFolders(airsonic_api)
-
-#     newSongIds = self.getNewSongs(lib, conn)
-#     if not newSongIds:
-#         print(u'No new songs to sync, leaving')
-#         return
-#     playlistId = self.getCurPlaylist(conn)
-#     self.addSongsToPlaylist(conn, newSongIds, playlistId)
-
-def find_airsonic_songid(airsonic_api, song):
-    print(f"looking for song {song}")
-    searchQuery = song.name + " " + song.artist
-    reply = airsonic_api.search3(searchQuery, artistCount=1, albumCount=1, songCount=1)
-
-    #peel back the artist and album layers to get the song id
-    searchResult = reply.get("searchResult3")
-    res = searchResult.get("song")
-    res = song[0] #peel back the list, since we only expect one result
-
-    print(f"found song       name: {res.get('title')}, artist: {res.get('artist')}, album: {res.get('album')}")
-
-    print(res.keys())
-
-    return res.get("id")
-
-
-
+        print("scanning...")
+        time.sleep(2)
 
 def import_songs_airsonic(import_dir, airsonic_library_dir):
     _, _, song_files = next(os.walk(import_dir), (None, None, []))
 
     songs = []
+
+    print(f"importing {len(song_files)} songs...")
 
     for song_file in song_files:
         audiofile = eyed3.load(f"{import_dir}/{song_file}")
@@ -141,7 +114,8 @@ def import_songs_airsonic(import_dir, airsonic_library_dir):
         shutil.copy2(f"{import_dir}/{song_file}", song_dir)
 
         #TODO which provides better airsonic search results, straight id3 tags or sanitized canonical versions?
-        song = Song(name=audiofile.tag.name,
+        # id3 tags seems to be good
+        song = Song(name=audiofile.tag.title,
                     artist=audiofile.tag.artist,
                     album=audiofile.tag.album,
                     original_file=f"{import_dir}/{song_file}",
@@ -151,6 +125,99 @@ def import_songs_airsonic(import_dir, airsonic_library_dir):
 
     return songs
 
+def get_airsonic_song_ids(airsonic_api, songs):
+    def get_songid(airsonic_api, song):
+        print(f"Looking for song {song}")
+        searchQuery = song.name + " " + song.artist
+        reply = airsonic_api.search3(searchQuery, artistCount=1, albumCount=1, songCount=1)
+
+        #peel back the artist and album layers to get the song id
+        searchResult = reply.get("searchResult3")
+        res = searchResult.get("song")
+        res = res[0] #peel back the list, since we only expect one result
+
+        print(f"Found song       name: {res.get('title')}, artist: {res.get('artist')}, album: {res.get('album')}, library_file: {res.get('path')}, id: {res.get('id')}")
+
+        song.airsonic_song_id = res.get("id")
+        return
+
+    for song in songs:
+        get_songid(airsonic_api, song)
+
+def get_create_playlist(airsonic_api):
+
+    def find_playlist(name):
+        reply = airsonic_api.getPlaylists()
+        if not reply:
+            raise ValueError("Could not contact server, ensure the information in the config is correct and the server includes http:// or https://")
+
+        playlists = reply.get("playlists").get("playlist")
+        for playlist in playlists:
+            if (playlist.get("name") == name):
+                playlistId = playlist.get("id")
+                return playlistId
+
+        return None
+
+    def create_playlist(name):
+# def createPlaylist(self, playlistId=None, name=None, songIds=[]):
+#         """
+#         since: 1.2.0
+#         Creates OR updates a playlist.  If updating the list, the
+#         playlistId is required.  If creating a list, the name is required.
+#         playlistId:str      The ID of the playlist to UPDATE
+#         name:str            The name of the playlist to CREATE
+#         songIds:list        The list of songIds to populate the list with in
+#                             either create or update mode.  Note that this
+#                             list will replace the existing list if updating
+#         Returns a dict like the following:
+#         {u'status': u'ok',
+#          u'version': u'1.5.0',
+#          u'xmlns': u'http://subsonic.org/restapi'}
+#         """
+        reply = airsonic_api.createPlaylist(playlistId=None, name=curr_name)
+        if not reply:
+            raise ValueError("Could not contact server, ensure the information in the config is correct and the server includes http:// or https://")
+
+
+    date = datetime.datetime.now()
+    curr_name = date.strftime("%Y") + " " + date.strftime("%m") + " " + date.strftime("%B")
+    playlist_id = find_playlist(curr_name)
+    if playlist_id:
+        return playlist_id
+
+    # not found, lets make it
+    create_playlist(curr_name)
+    playlist_id = find_playlist(curr_name)
+    if not playlist_id:
+        raise ValueError("Unable to find the playlist after creating it, name: {curr_name}")
+
+    return playlist_id
+
+
+def update_playlist(airsonic_api, playlist_id, songs):
+    ids = [song.airsonic_song_id for song in songs]
+
+# def createPlaylist(self, playlistId=None, name=None, songIds=[]):
+#         """
+#         since: 1.2.0
+#         Creates OR updates a playlist.  If updating the list, the
+#         playlistId is required.  If creating a list, the name is required.
+#         playlistId:str      The ID of the playlist to UPDATE
+#         name:str            The name of the playlist to CREATE
+#         songIds:list        The list of songIds to populate the list with in
+#                             either create or update mode.  Note that this
+#                             list will replace the existing list if updating
+#         Returns a dict like the following:
+#         {u'status': u'ok',
+#          u'version': u'1.5.0',
+#          u'xmlns': u'http://subsonic.org/restapi'}
+#         """
+    reply = airsonic_api.createPlaylist(playlistId=playlist_id, name=None, songIds=ids)
+    if not reply:
+        raise ValueError("Could not contact server, ensure the information in the config is correct and the server includes http:// or https://")
+
+    print(f"Added {len(ids)} songs to playlist {playlist_id}")
 
 @click.command()
 @click.option("--airsonic_username", type=str, required=True, help="username of the user to login as")
@@ -170,28 +237,9 @@ def main(airsonic_username, airsonic_password, server, port, import_dir, airsoni
     airsonic_api = connect_airsonic(server, port, airsonic_username, airsonic_password)
     songs = import_songs_airsonic(import_dir, airsonic_library_dir)
     scan_media_folders(airsonic_api)
-
-    #TODO
-    # - get all songs airsonic ids
-    # - make the playlist if necessary
-    # - update the playlist with the new songs. createPlaylist is what we want:
-# def createPlaylist(self, playlistId=None, name=None, songIds=[]):
-#         """
-#         since: 1.2.0
-#         Creates OR updates a playlist.  If updating the list, the
-#         playlistId is required.  If creating a list, the name is required.
-#         playlistId:str      The ID of the playlist to UPDATE
-#         name:str            The name of the playlist to CREATE
-#         songIds:list        The list of songIds to populate the list with in
-#                             either create or update mode.  Note that this
-#                             list will replace the existing list if updating
-#         Returns a dict like the following:
-#         {u'status': u'ok',
-#          u'version': u'1.5.0',
-#          u'xmlns': u'http://subsonic.org/restapi'}
-#         """
-
-
+    get_airsonic_song_ids(airsonic_api, songs)
+    playlist_id = get_create_playlist(airsonic_api)
+    update_playlist(airsonic_api, playlist_id, songs)
 
     if empty_import_dir:
         for song in songs:

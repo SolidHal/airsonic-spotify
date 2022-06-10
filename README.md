@@ -7,6 +7,8 @@ create a docker image that:
 use the spotipy api to automatically move all newly saved songs into the "NEW" playlist
 - use the date/time added metadata to determine what the "new" saved songs are
 
+- spotify-playlist-update.py
+
 # part 2
 leverage https://github.com/SolidHal/tsar:
 automatically download all songs from a specified playlist
@@ -15,13 +17,27 @@ automatically download all songs from a specified playlist
 # part 3
 - place the songs into the airsonic library
 - update the monthly playlist in airsonic
-  - use py-sonic
+
+- airsonic-import.py
   
  
  
 TODO:
-airsonic server is too old, migrate to airsonic-advanced
- 
+-  wrap it all into a single docker image which takes
+  - spotipy env vars
+  - spotify username/pass
+  - airsonic username/pass
+  - airsonic server/port
+  - airsonic library directory
+  - import directory
+  - spotify playlist_id
+
+and runs the 3 parts intermittently, nightly
+
 ## requirements
 - tsar
 - py-sonic : https://github.com/crustymonkey/py-sonic
+- eyed3
+- click
+- spotify premium
+- an airsonic(advanced) server or similar
