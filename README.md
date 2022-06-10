@@ -9,7 +9,19 @@ use the spotipy api to automatically move all newly saved songs into the "NEW" p
 
 # part 2
 leverage https://github.com/SolidHal/tsar:
-1) automatically download all songs from a specified playlist
+automatically download all songs from a specified playlist
   - with tags, album art, etc
-2) place them in the airsonic library
-3) update the monthly playlist in airsonic
+  
+# part 3
+- place the songs into the airsonic library
+- update the monthly playlist in airsonic
+  - use py-sonic
+  
+ 
+ 
+TODO:
+airsonic server is too old, migrate to airsonic-advanced
+ 
+## requirements
+- tsar
+- py-sonic : https://github.com/crustymonkey/py-sonic
