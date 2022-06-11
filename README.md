@@ -41,3 +41,10 @@ and runs the 3 parts intermittently, nightly
 - click
 - spotify premium
 - an airsonic(advanced) server or similar
+
+
+## build the docker image
+
+```
+docker build -t soldiahl/airsonic-spotify .
+```
