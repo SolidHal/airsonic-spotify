@@ -46,5 +46,5 @@ and runs the 3 parts intermittently, nightly
 ## build the docker image
 
 ```
-docker build -t soldiahl/airsonic-spotify .
+docker build -t solidhal/airsonic-spotify .
 ```

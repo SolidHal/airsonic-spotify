@@ -19,6 +19,8 @@ FROM ubuntu:latest
 # AIRSONIC_LIBRARY_DIR
 # TEMPORARY_IMPORT_DIR
 
+# the following file must be provided
+# spotipy authentication cache file
 
 
 ENV LANG C.UTF-8
@@ -50,14 +52,6 @@ ENV PATH="/root/.cargo/bin:${PATH}"
 RUN cargo --help
 
 
-# Get python packages
-RUN pip3 install \
-    py-sonic \
-    click \
-    eyed3 \
-    spotipy
-
-
 # Get librespot
 # TODO switch to upstream librespot once PR has merged
 RUN git clone https://github.com/SolidHal/librespot.git
@@ -72,5 +66,13 @@ RUN cp tsar/tsar.py /usr/bin/tsar.py
 # Get supporting scripts
 COPY airsonic-import.py /usr/bin/airsonic-import.py
 COPY spotify-update-playlist.py /usr/bin/spotify-update-playlist.py
+
+# Get python packages
+RUN pip3 install \
+    py-sonic \
+    click \
+    eyed3 \
+    spotipy \
+    schedule
 
 # TODO write entry script
