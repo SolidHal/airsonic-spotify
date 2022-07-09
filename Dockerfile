@@ -6,40 +6,41 @@ FROM ubuntu:latest
 # - likely need to chown things?
 
 # the following envars must be set
-# SPOTIFY_USERNAME
-# SPOTIFY_PASSWORD
-# SPOTIPY_CLIENT_ID
-# SPOTIPY_CLIENT_SECRET
-# SPOTIPY_REDIRECT_URI
-# SPOTIFY_PLAYLIST_URI
-# AIRSONIC_USERNAME
-# AIRSONIC_PASSWORD
+ENV PUID=""
+ENV PGID=""
+ENV SPOTIFY_USERNAME=""
+ENV SPOTIFY_PASSWORD=""
+ENV SPOTIPY_CLIENT_ID=""
+ENV SPOTIPY_CLIENT_SECRET=""
+ENV SPOTIPY_REDIRECT_URI=""
+ENV SPOTIFY_PLAYLIST_URI=""
+ENV AIRSONIC_USERNAME=""
+ENV AIRSONIC_PASSWORD=""
+ENV AIRSONIC_SERVER=""
+ENV AIRSONIC_PORT=""
 
 # the following directories must be provided
-# AIRSONIC_LIBRARY_DIR
-# TEMPORARY_IMPORT_DIR
+# AIRSONIC_LIBRARY_DIR mapped to /airsonic
 
 # the following file must be provided
-# spotipy authentication cache file
+# spotipy authentication cache file mapped to "/.cache-<spotify_username>"
 
 
 ENV LANG C.UTF-8
 
-# Update default packages
-RUN apt-get update
-
 # Get Ubuntu packages
-RUN apt-get install -y \
+RUN apt-get update && apt-get install -y \
     build-essential \
     curl \
     python3 \
     git \
     libasound2-dev \
     python3-pip \
-    pkg-config
+    pkg-config  \
+    ffmpeg
 
-# Update new packages
-RUN apt-get update
+
+RUN apt-get autoremove --purge
 
 # Get Rust
 RUN curl https://sh.rustup.rs -sSf | bash -s -- -y
@@ -63,10 +64,6 @@ RUN librespot --version
 RUN git clone https://github.com/SolidHal/tsar.git
 RUN cp tsar/tsar.py /usr/bin/tsar.py
 
-# Get supporting scripts
-COPY airsonic-import.py /usr/bin/airsonic-import.py
-COPY spotify-update-playlist.py /usr/bin/spotify-update-playlist.py
-
 # Get python packages
 RUN pip3 install \
     py-sonic \
@@ -75,4 +72,26 @@ RUN pip3 install \
     spotipy \
     schedule
 
-# TODO write entry script
+# create the user and group
+RUN useradd -u 911 -U -d /config -s /bin/false abc
+RUN usermod -G users abc
+RUN mkdir -p /config
+
+# set timezone
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && \
+    apt-get install -yq tzdata && \
+    ln -fs /usr/share/zoneinfo/America/Chicago /etc/localtime && \
+    dpkg-reconfigure -f noninteractive tzdata
+ENV TZ="America/Chicago"
+
+# Get supporting scripts
+COPY tool_scripts/airsonic_import.py /usr/bin/airsonic_import.py
+COPY tool_scripts/spotify_update_playlist.py /usr/bin/spotify_update_playlist.py
+
+# dont buffer python log output
+ENV PYTHONUNBUFFERED="TRUE"
+
+COPY docker_scripts/entrypoint.sh /entrypoint.sh
+COPY docker_scripts/run.py /run.py
+ENTRYPOINT ["/entrypoint.sh"]

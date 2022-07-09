@@ -20,6 +20,10 @@ def start_api(username):
     SPOTIPY_CLIENT_SECRET
     SPOTIPY_REDIRECT_URI
     """
+    # check for env vars
+    os.environ["SPOTIPY_CLIENT_ID"]
+    os.environ["SPOTIPY_CLIENT_SECRET"]
+    os.environ["SPOTIPY_REDIRECT_URI"]
     scope = 'user-read-private user-read-playback-state user-modify-playback-state user-library-read playlist-modify-private playlist-modify-public'
 
     try:

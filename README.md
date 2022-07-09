@@ -1,50 +1,58 @@
+# airsonic-spotify
 
+A docker image to automatically import newly saved spotify songs into airsonic
 
-TODO
-create a docker image that:
-
-# part 1
-use the spotipy api to automatically move all newly saved songs into the "NEW" playlist
-- use the date/time added metadata to determine what the "new" saved songs are
-
-- spotify-playlist-update.py
-
-# part 2
-leverage https://github.com/SolidHal/tsar:
-automatically download all songs from a specified playlist
-  - with tags, album art, etc
-  
-# part 3
-- place the songs into the airsonic library
-- update the monthly playlist in airsonic
-
-- airsonic-import.py
-  
- 
- 
-TODO:
--  wrap it all into a single docker image which takes
-  - spotipy env vars
-  - spotify username/pass
-  - airsonic username/pass
-  - airsonic server/port
-  - airsonic library directory
-  - import directory
-  - spotify playlist_id
-
-and runs the 3 parts intermittently, nightly
+Roughly it works like this:
+- Move all newly saved songs to a user created "new-songs" playlist. see `tool_scripts/spotify_update_playlist.py`
+- Use tsar https://github.com/SolidHal/tsar to get all songs in the playlist, then empties the playlist
+- Copy the song files into the airsonic library in the proper `artist/album/song.mp3` organization, then add all the songs to a monthly playlist named `Month Year`. see `tool_scripts/airsonic_import.py`
 
 ## requirements
-- tsar
-- py-sonic : https://github.com/crustymonkey/py-sonic
-- eyed3
-- click
-- spotify premium
+- spotify premium, required to use the api
 - an airsonic(advanced) server or similar
 
+## setup
 
-## build the docker image
+### build the docker image
 
 ```
 docker build -t solidhal/airsonic-spotify .
+```
+
+### generate a spotipy authentication cache token
+
+get the required SPOTIPY api values: https://www.youtube.com/watch?v=3RGm4jALukM
+
+```
+export SPOTIPY_CLIENT_ID=""
+export SPOTIPY_CLIENT_SECRET=""
+export SPOTIPY_REDIRECT_URI="http://www.somesite.com"
+./tool_scripts/generate_spotipy_cache.py --username "username"
+```
+this will give you a `.cache-<username>` file that you need to map into the docker image
+
+### Manually create a "new-songs" playlist
+create a playlist in spotify for the tool to work in
+set the playlist description with a timestamp in the format `2022-07-08 00:46:19.285023+00:00`
+this timestamp is how the tool will know what saved songs are new, and should be added to the playlist
+
+## run example
+
+```
+docker run \
+-v /home/user/.cache-username:/.cache-username \
+-v /home/user/airsonic_dir:/airsonic \
+-e SPOTIPY_CLIENT_ID="" \
+-e SPOTIPY_CLIENT_SECRET="" \
+-e SPOTIPY_REDIRECT_URI="http://www.somesite.com" \
+-e SPOTIFY_USERNAME="" \
+-e SPOTIFY_PASSWORD="" \
+-e SPOTIFY_PLAYLIST_URI="spotify:playlist:<blah>" \
+-e AIRSONIC_USERNAME="" \
+-e AIRSONIC_PASSWORD="" \
+-e AIRSONIC_SERVER="http://192.168.10.10" \
+-e AIRSONIC_PORT="4042" \
+-e PUID="1000" \
+-e PGID="1000" \
+solidhal/airsonic-spotify
 ```
