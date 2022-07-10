@@ -65,13 +65,13 @@ def main():
         print("____ airsonic-spotify: START updating spotify playlist with new songs _____")
         # TODO will this run in the root dir? if not then the cache token won't be available
         # spotipy envars are provided by the caller
-        spotify_update_playlist.main(playlist_id=spotify_playlist_uri, username=spotify_username)
+        spotify_update_playlist.run(playlist_id=spotify_playlist_uri, username=spotify_username)
         print("____ airsonic-spotify: FINISHED updating spotify playlist with new songs _____")
 
     def run_tsar_and_import():
         run_update_spotify_playlist()
         print("____ airsonic-spotify: START running tsar ____")
-        tsar.main(output_dir=temp_import_dir,
+        tsar.run(output_dir=temp_import_dir,
                   playlist_id=spotify_playlist_uri,
                   username=spotify_username,
                   password=spotify_password,
@@ -80,7 +80,7 @@ def main():
         print("____ airsonic-spotify: FINISHED running tsar ____")
 
         print("_____ airsonic-spotify: START importing new songs into airsonic ____")
-        airsonic_import.main(airsonic_username=airsonic_username,
+        airsonic_import.run(airsonic_username=airsonic_username,
                              airsonic_password=airsonic_password,
                              server=airsonic_server,
                              port=airsonic_port,

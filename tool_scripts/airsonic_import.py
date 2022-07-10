@@ -142,13 +142,14 @@ def get_airsonic_song_ids(airsonic_api, songs):
             raise ValueError(f"unable to find airsonic id for song {song.name} {song.artist}")
 
         for res in all_res:
-            if sanitize_string(song.airsonic_library_file) in sanitize_string(res.get('path')):
+            if sanitize_string(song.airsonic_library_file.split("/")[-1]) in sanitize_string(res.get('path')):
                 print(f"Found song       name:  {res.get('title')}, artist: {res.get('artist')}, album: {res.get('album')}, library_file: {res.get('path')}, id: {res.get('id')}")
                 song.airsonic_song_id = res.get("id")
                 return
-        raise ValueError(f"""unable to find song in airsonic search results.
+        raise ValueError(f"""unable to find song in airsonic search results. None of the results matched the following:
+                                 library_file = {sanitize_string(song.airsonic_library_file)}
                                  ==================================================================
-                                 song: = {song}
+                                 song = {song}
                                  ==================================================================
                                  all_res = {all_res}
                                  ==================================================================
@@ -247,16 +248,8 @@ def update_playlist(airsonic_api, playlist_id, songs):
         raise ValueError(f"expected {expected_size} songs in playlist after adding {len(songs)} songs. Found {actual_size} songs in playlist.")
     print(f"Added {len(songs)} songs to playlist {playlist_id}")
 
-@click.command()
-@click.option("--airsonic_username", type=str, required=True, help="username of the user to login as")
-@click.option("--airsonic_password", type=str, required=True, help="password of the user to login as")
-@click.option("--server", type=str, required=True, help="server url")
-@click.option("--port", type=str, required=True, help="server port")
-@click.option("--import_dir", type=str, required=True, help="directory to import music from")
-@click.option("--airsonic_library_dir", type=str, required=True, help="directory to import music to")
-@click.option("--empty_import_dir", is_flag=True, default=False, help="remove all songs from the import_dir when complete")
-def main(airsonic_username, airsonic_password, server, port, import_dir, airsonic_library_dir, empty_import_dir):
 
+def run(airsonic_username, airsonic_password, server, port, import_dir, airsonic_library_dir, empty_import_dir):
     if not os.path.isdir(import_dir):
         raise ValueError(f"import directory does not exist: {import_dir}")
     if not os.path.isdir(airsonic_library_dir):
@@ -273,6 +266,22 @@ def main(airsonic_username, airsonic_password, server, port, import_dir, airsoni
         for song in songs:
             os.remove(song.original_file)
 
+@click.command()
+@click.option("--airsonic_username", type=str, required=True, help="username of the user to login as")
+@click.option("--airsonic_password", type=str, required=True, help="password of the user to login as")
+@click.option("--server", type=str, required=True, help="server url")
+@click.option("--port", type=str, required=True, help="server port")
+@click.option("--import_dir", type=str, required=True, help="directory to import music from")
+@click.option("--airsonic_library_dir", type=str, required=True, help="directory to import music to")
+@click.option("--empty_import_dir", is_flag=True, default=False, help="remove all songs from the import_dir when complete")
+def main(airsonic_username, airsonic_password, server, port, import_dir, airsonic_library_dir, empty_import_dir):
+    run(airsonic_username=airsonic_username,
+        airsonic_password=airsonic_password,
+        server=server,
+        port=port,
+        import_dir=import_dir,
+        airsonic_library_dir=airsonic_library_dir,
+        empty_import_dir=empty_import_dir)
 
 if __name__ == "__main__":
     main()

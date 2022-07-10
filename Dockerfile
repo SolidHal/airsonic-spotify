@@ -1,10 +1,6 @@
 # syntax=docker/dockerfile:1
 FROM ubuntu:latest
 
-
-# TODO determine how to take/use PGID and PUID
-# - likely need to chown things?
-
 # the following envars must be set
 ENV PUID=""
 ENV PGID=""
@@ -30,37 +26,16 @@ ENV SCHEDULE_FREQUENCY=""
 # the following file must be provided
 # spotipy authentication cache file mapped to "/.cache-<spotify_username>"
 
-
 ENV LANG C.UTF-8
 
 # Get Ubuntu packages
 RUN apt-get update && apt-get install -y  --no-install-recommends \
-    build-essential \
     curl \
+    wget \
     python3 \
     git \
-    libasound2-dev \
     python3-pip \
-    pkg-config  \
     ffmpeg
-
-
-# Get Rust
-RUN curl https://sh.rustup.rs -sSf | bash -s -- -y
-
-# include rust in the path
-ENV PATH="/root/.cargo/bin:${PATH}"
-
-# Check cargo is visible
-RUN cargo --help
-
-# Get librespot
-# TODO switch to upstream librespot once PR has merged
-RUN git clone https://github.com/SolidHal/librespot.git
-RUN cd librespot && cargo build --release
-RUN cp librespot/target/release/librespot /usr/bin/librespot
-RUN librespot --version
-RUN rm -rf librespot/
 
 # Get python packages
 RUN pip3 install \
@@ -70,18 +45,18 @@ RUN pip3 install \
     spotipy \
     schedule
 
+# clean up to minimize image size
+RUN rm -rf /var/cache/apt/archives && rm -rf /usr/share/doc && rm -rf /usr/share/man
+
+# Get librespot, use prebuilt x86_64 binary to minimize image size
+# saves ~2GB of image size, and a ton of time
+# TODO switch to upstream librespot once PR has merged
+RUN wget https://github.com/SolidHal/librespot/releases/download/vdebug/librespot -O /usr/bin/librespot && chmod +x /usr/bin/librespot
+
 # create the user and group
 RUN useradd -u 911 -U -d /config -s /bin/false abc
 RUN usermod -G users abc
 RUN mkdir -p /config
-
-# clean up build deps to minimize image size
-RUN apt-get remove -y --purge build-essential pkg-config libasound2-dev curl && apt-get autoremove -y --purge
-RUN rm -rf /var/cache/apt/archives && rm -rf /usr/share/doc && rm -rf /usr/share/man
-
-# clean up rust
-RUN rustup self uninstall -y
-RUN rm -rf ~/.cargo
 
 # Setup script lib folder
 RUN mkdir -p /tool_scripts

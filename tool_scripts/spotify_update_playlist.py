@@ -91,11 +91,7 @@ def get_playlist_timestamp(spotify_api, playlist_id):
 
 
 
-@click.command()
-@click.option("--playlist_id", type=str, required=True, help="playlist uri to record, of the form spotify:playlist:<rand>")
-@click.option("--username", type=str, required=True, help="username of the user to login as")
-def main(playlist_id, username):
-
+def run(playlist_id, username):
     spotify_api = start_api(username)
     timestamp = get_playlist_timestamp(spotify_api, playlist_id)
     new_tracks = get_new_saved_tracks(spotify_api, timestamp)
@@ -104,6 +100,13 @@ def main(playlist_id, username):
 
     set_playlist_timestamp(spotify_api, playlist_id)
 
+
+
+@click.command()
+@click.option("--playlist_id", type=str, required=True, help="playlist uri to record, of the form spotify:playlist:<rand>")
+@click.option("--username", type=str, required=True, help="username of the user to login as")
+def main(playlist_id, username):
+    run(playlist_id=playlist_id, username=username)
 
 if __name__ == "__main__":
     main()
