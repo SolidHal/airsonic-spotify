@@ -2,3 +2,4 @@
 /tmp*
 /import*
 /__pycache__
+/tool_scripts/__pycache__

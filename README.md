@@ -56,3 +56,8 @@ docker run \
 -e PGID="1000" \
 solidhal/airsonic-spotify
 ```
+
+
+TODO: updating an existing airsonic playlist shouldn't empty it: test
+TODO: run.py subprocess calls seem to have their output eaten, test most recent version
+TODO: improve matching airsonic import search, it added the wrong songs: test

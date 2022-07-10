@@ -127,19 +127,33 @@ def import_songs_airsonic(import_dir, airsonic_library_dir):
 
 def get_airsonic_song_ids(airsonic_api, songs):
     def get_songid(airsonic_api, song):
+
+        def sanitize_string(in_string):
+            return in_string.lower().lstrip(" ").rstrip("")
+
         print(f"Looking for song {song}")
-        searchQuery = song.name + " " + song.artist
-        reply = airsonic_api.search3(searchQuery, artistCount=1, albumCount=1, songCount=1)
+        searchQuery = song.name + "" + song.album
+        reply = airsonic_api.search3(searchQuery, artistCount=1, albumCount=1, songCount=10)
 
         #peel back the artist and album layers to get the song id
         searchResult = reply.get("searchResult3")
-        res = searchResult.get("song")
-        res = res[0] #peel back the list, since we only expect one result
+        all_res = searchResult.get("song")
+        if len(all_res) == 0:
+            raise ValueError(f"unable to find airsonic id for song {song.name} {song.artist}")
 
-        print(f"Found song       name: {res.get('title')}, artist: {res.get('artist')}, album: {res.get('album')}, library_file: {res.get('path')}, id: {res.get('id')}")
+        for res in all_res:
+            if sanitize_string(song.airsonic_library_file) in sanitize_string(res.get('path')):
+                print(f"Found song       name:  {res.get('title')}, artist: {res.get('artist')}, album: {res.get('album')}, library_file: {res.get('path')}, id: {res.get('id')}")
+                song.airsonic_song_id = res.get("id")
+                return
+        raise ValueError(f"""unable to find song in airsonic search results.
+                                 ==================================================================
+                                 song: = {song}
+                                 ==================================================================
+                                 all_res = {all_res}
+                                 ==================================================================
+            """)
 
-        song.airsonic_song_id = res.get("id")
-        return
 
     for song in songs:
         get_songid(airsonic_api, song)
@@ -155,6 +169,7 @@ def get_create_playlist(airsonic_api):
         for playlist in playlists:
             if (playlist.get("name") == name):
                 playlistId = playlist.get("id")
+                print(f"found playlist name = {name}, id = {playlistId}, songCount = {playlist.get('songCount')}")
                 return playlistId
 
         return None
@@ -175,6 +190,7 @@ def get_create_playlist(airsonic_api):
 #          u'version': u'1.5.0',
 #          u'xmlns': u'http://subsonic.org/restapi'}
 #         """
+        print(f"creating playlist with name {curr_name}")
         reply = airsonic_api.createPlaylist(playlistId=None, name=curr_name)
         if not reply:
             raise ValueError("Could not contact server, ensure the information in the config is correct and the server includes http:// or https://")
@@ -184,6 +200,7 @@ def get_create_playlist(airsonic_api):
     curr_name = date.strftime("%Y") + " " + date.strftime("%m") + " " + date.strftime("%B")
     playlist_id = find_playlist(curr_name)
     if playlist_id:
+        print(f"found existing playlist with name {curr_name}, playlist_id {playlist_id}")
         return playlist_id
 
     # not found, lets make it
@@ -196,7 +213,13 @@ def get_create_playlist(airsonic_api):
 
 
 def update_playlist(airsonic_api, playlist_id, songs):
-    ids = [song.airsonic_song_id for song in songs]
+    existing_ids = []
+    curr_size = airsonic_api.getPlaylist(playlist_id).get("playlist").get("songCount")
+
+    playlist_entries = airsonic_api.getPlaylist(playlist_id).get("playlist").get("entry", [])
+    for entry in playlist_entries:
+        existing_ids.append(entry.get("id"))
+    ids = existing_ids + [song.airsonic_song_id for song in songs]
 
 # def createPlaylist(self, playlistId=None, name=None, songIds=[]):
 #         """
@@ -217,7 +240,12 @@ def update_playlist(airsonic_api, playlist_id, songs):
     if not reply:
         raise ValueError("Could not contact server, ensure the information in the config is correct and the server includes http:// or https://")
 
-    print(f"Added {len(ids)} songs to playlist {playlist_id}")
+    expected_size = curr_size + len(songs)
+    actual_size = airsonic_api.getPlaylist(playlist_id).get("playlist").get("songCount")
+
+    if(expected_size != actual_size):
+        raise ValueError(f"expected {expected_size} songs in playlist after adding {len(songs)} songs. Found {actual_size} songs in playlist.")
+    print(f"Added {len(songs)} songs to playlist {playlist_id}")
 
 @click.command()
 @click.option("--airsonic_username", type=str, required=True, help="username of the user to login as")
@@ -244,10 +272,6 @@ def main(airsonic_username, airsonic_password, server, port, import_dir, airsoni
     if empty_import_dir:
         for song in songs:
             os.remove(song.original_file)
-
-
-
-
 
 
 if __name__ == "__main__":

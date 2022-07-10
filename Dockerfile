@@ -18,6 +18,11 @@ ENV AIRSONIC_USERNAME=""
 ENV AIRSONIC_PASSWORD=""
 ENV AIRSONIC_SERVER=""
 ENV AIRSONIC_PORT=""
+ENV SCHEDULE_FREQUENCY=""
+#one of:
+#  - NOW  : Run tsar & update airsonic playlist immediately, and then exit
+#  - <HH:MM> : run tsar & update airsonic playlist daily at <HH:MM> UTC
+#  - DEBUG : Like "NOW" but does not automatically exit when complete
 
 # the following directories must be provided
 # AIRSONIC_LIBRARY_DIR mapped to /airsonic
@@ -29,7 +34,7 @@ ENV AIRSONIC_PORT=""
 ENV LANG C.UTF-8
 
 # Get Ubuntu packages
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y  --no-install-recommends \
     build-essential \
     curl \
     python3 \
@@ -40,18 +45,14 @@ RUN apt-get update && apt-get install -y \
     ffmpeg
 
 
-RUN apt-get autoremove --purge
-
 # Get Rust
 RUN curl https://sh.rustup.rs -sSf | bash -s -- -y
 
 # include rust in the path
 ENV PATH="/root/.cargo/bin:${PATH}"
 
-
 # Check cargo is visible
 RUN cargo --help
-
 
 # Get librespot
 # TODO switch to upstream librespot once PR has merged
@@ -59,10 +60,7 @@ RUN git clone https://github.com/SolidHal/librespot.git
 RUN cd librespot && cargo build --release
 RUN cp librespot/target/release/librespot /usr/bin/librespot
 RUN librespot --version
-
-# Get tsar
-RUN git clone https://github.com/SolidHal/tsar.git
-RUN cp tsar/tsar.py /usr/bin/tsar.py
+RUN rm -rf librespot/
 
 # Get python packages
 RUN pip3 install \
@@ -77,17 +75,26 @@ RUN useradd -u 911 -U -d /config -s /bin/false abc
 RUN usermod -G users abc
 RUN mkdir -p /config
 
-# set timezone
-ENV DEBIAN_FRONTEND=noninteractive
-RUN apt-get update && \
-    apt-get install -yq tzdata && \
-    ln -fs /usr/share/zoneinfo/America/Chicago /etc/localtime && \
-    dpkg-reconfigure -f noninteractive tzdata
-ENV TZ="America/Chicago"
+# clean up build deps to minimize image size
+RUN apt-get remove -y --purge build-essential pkg-config libasound2-dev curl && apt-get autoremove -y --purge
+RUN rm -rf /var/cache/apt/archives && rm -rf /usr/share/doc && rm -rf /usr/share/man
+
+# clean up rust
+RUN rustup self uninstall -y
+RUN rm -rf ~/.cargo
+
+# Setup script lib folder
+RUN mkdir -p /tool_scripts
+RUN touch /tool_scripts/__init__.py
+
+# Get tsar
+RUN git clone https://github.com/SolidHal/tsar.git 
+RUN cp tsar/tsar.py /tool_scripts/tsar.py
+RUN rm -rf tsar/
 
 # Get supporting scripts
-COPY tool_scripts/airsonic_import.py /usr/bin/airsonic_import.py
-COPY tool_scripts/spotify_update_playlist.py /usr/bin/spotify_update_playlist.py
+COPY tool_scripts/airsonic_import.py /tool_scripts/airsonic_import.py
+COPY tool_scripts/spotify_update_playlist.py /tool_scripts/spotify_update_playlist.py
 
 # dont buffer python log output
 ENV PYTHONUNBUFFERED="TRUE"
