@@ -159,7 +159,7 @@ def get_airsonic_song_ids(airsonic_api, songs):
     for song in songs:
         get_songid(airsonic_api, song)
 
-def get_create_playlist(airsonic_api):
+def get_create_playlist(airsonic_api, name):
 
     def find_playlist(name):
         reply = airsonic_api.getPlaylists()
@@ -191,24 +191,22 @@ def get_create_playlist(airsonic_api):
 #          u'version': u'1.5.0',
 #          u'xmlns': u'http://subsonic.org/restapi'}
 #         """
-        print(f"creating playlist with name {curr_name}")
-        reply = airsonic_api.createPlaylist(playlistId=None, name=curr_name)
+        print(f"creating playlist with name {name}")
+        reply = airsonic_api.createPlaylist(playlistId=None, name=name)
         if not reply:
             raise ValueError("Could not contact server, ensure the information in the config is correct and the server includes http:// or https://")
 
 
-    date = datetime.datetime.now()
-    curr_name = date.strftime("%Y") + " " + date.strftime("%m") + " " + date.strftime("%B")
-    playlist_id = find_playlist(curr_name)
+    playlist_id = find_playlist(name)
     if playlist_id:
-        print(f"found existing playlist with name {curr_name}, playlist_id {playlist_id}")
+        print(f"found existing playlist with name {name}, playlist_id {playlist_id}")
         return playlist_id
 
     # not found, lets make it
-    create_playlist(curr_name)
-    playlist_id = find_playlist(curr_name)
+    create_playlist(name)
+    playlist_id = find_playlist(name)
     if not playlist_id:
-        raise ValueError("Unable to find the playlist after creating it, name: {curr_name}")
+        raise ValueError("Unable to find the playlist after creating it, name: {name}")
 
     return playlist_id
 
@@ -259,7 +257,9 @@ def run(airsonic_username, airsonic_password, server, port, import_dir, airsonic
     songs = import_songs_airsonic(import_dir, airsonic_library_dir)
     scan_media_folders(airsonic_api)
     get_airsonic_song_ids(airsonic_api, songs)
-    playlist_id = get_create_playlist(airsonic_api)
+    date = datetime.datetime.now()
+    playlist_name = date.strftime("%Y") + " " + date.strftime("%m") + " " + date.strftime("%B")
+    playlist_id = get_create_playlist(airsonic_api, playlist_name)
     update_playlist(airsonic_api, playlist_id, songs)
 
     if empty_import_dir:
