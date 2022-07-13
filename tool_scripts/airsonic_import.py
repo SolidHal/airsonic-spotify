@@ -141,8 +141,11 @@ def get_airsonic_song_ids(airsonic_api, songs):
         if len(all_res) == 0:
             raise ValueError(f"unable to find airsonic id for song {song.name} {song.artist}")
 
+        lib_file = sanitize_string(song.airsonic_library_file.split("/")[-1])
         for res in all_res:
-            if sanitize_string(song.airsonic_library_file.split("/")[-1]) in sanitize_string(res.get('path')):
+            res_path = sanitize_string(res.get('path'))
+            print(f"Finding song id: Checking if {lib_file} is in {res_path}")
+            if lib_file in res_path:
                 print(f"Found song       name:  {res.get('title')}, artist: {res.get('artist')}, album: {res.get('album')}, library_file: {res.get('path')}, id: {res.get('id')}")
                 song.airsonic_song_id = res.get("id")
                 return
