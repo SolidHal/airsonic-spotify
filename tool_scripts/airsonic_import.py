@@ -125,21 +125,20 @@ def import_songs_airsonic(import_dir, airsonic_library_dir):
 
     return songs
 
-def get_airsonic_song_ids(airsonic_api, songs):
-    def get_songid(airsonic_api, song):
-
+def get_airsonic_song_id(airsonic_api, song):
+    def query_song(song, search_query):
         def sanitize_string(in_string):
             return in_string.lower().lstrip(" ").rstrip("")
 
-        print(f"Looking for song {song}")
-        searchQuery = song.name + "" + song.album
-        reply = airsonic_api.search3(searchQuery, artistCount=1, albumCount=1, songCount=10)
+        print(f"Looking for song using query {search_query}")
+        reply = airsonic_api.search3(search_query, artistCount=1, albumCount=1, songCount=20)
 
         #peel back the artist and album layers to get the song id
         searchResult = reply.get("searchResult3")
         all_res = searchResult.get("song")
         if len(all_res) == 0:
-            raise ValueError(f"unable to find airsonic id for song {song.name} {song.artist}")
+            print(f"no results found for search_query {search_query}")
+            return False
 
         lib_file = sanitize_string(song.airsonic_library_file.split("/")[-1])
         for res in all_res:
@@ -148,19 +147,34 @@ def get_airsonic_song_ids(airsonic_api, songs):
             if lib_file in res_path:
                 print(f"Found song       name:  {res.get('title')}, artist: {res.get('artist')}, album: {res.get('album')}, library_file: {res.get('path')}, id: {res.get('id')}")
                 song.airsonic_song_id = res.get("id")
-                return
-        raise ValueError(f"""unable to find song in airsonic search results. None of the results matched the following:
-                                 library_file = {sanitize_string(song.airsonic_library_file)}
-                                 ==================================================================
-                                 song = {song}
-                                 ==================================================================
-                                 all_res = {all_res}
-                                 ==================================================================
-            """)
+                return True
+
+        return False
 
 
-    for song in songs:
-        get_songid(airsonic_api, song)
+    # airsonic search is not always the best, try a few different queries
+    search_query = song.name + " " + song.album
+    if query_song(song, search_query):
+        return
+
+    search_query = song.name + " " + song.artist
+    if query_song(song, search_query):
+        return
+
+    search_query = song.name
+    if query_song(song, search_query):
+        return
+
+
+
+    raise ValueError(f"""unable to find song in airsonic search results. None of the results matched the following:
+    library_file = {sanitize_string(song.airsonic_library_file)}
+    ==================================================================
+    song = {song}
+    ==================================================================
+    """)
+
+
 
 def get_create_playlist(airsonic_api, name):
 
@@ -259,7 +273,8 @@ def run(airsonic_username, airsonic_password, server, port, import_dir, airsonic
     airsonic_api = connect_airsonic(server, port, airsonic_username, airsonic_password)
     songs = import_songs_airsonic(import_dir, airsonic_library_dir)
     scan_media_folders(airsonic_api)
-    get_airsonic_song_ids(airsonic_api, songs)
+    for song in songs:
+        get_airsonic_song_id(airsonic_api, song)
     date = datetime.datetime.now()
     playlist_name = date.strftime("%Y") + " " + date.strftime("%m") + " " + date.strftime("%B")
     playlist_id = get_create_playlist(airsonic_api, playlist_name)
