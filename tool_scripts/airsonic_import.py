@@ -65,6 +65,9 @@ def canonical_artist(audiofile):
 
     # track_artist may be malformed and not split correctly. album_artist is more reliable
     if album_artist not in track_artist:
+        # if the album artist is generic, just use the track artist
+        if "Various Artists" in album_artist:
+            return track_artist
         raise ValueError(f"could not determine canonical artist, track_artist = {track_artist}, album_artist = {album_artist}")
 
     return album_artist
