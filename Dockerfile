@@ -63,9 +63,8 @@ RUN mkdir -p /tool_scripts
 RUN touch /tool_scripts/__init__.py
 
 # Get tsar
-RUN git clone https://github.com/SolidHal/tsar.git 
-RUN cp tsar/tsar.py /tool_scripts/tsar.py
-RUN rm -rf tsar/
+RUN git clone https://github.com/SolidHal/tsar.git /tsar
+RUN cd tool_scripts && ln -s /tsar/tsar.py tsar.py
 
 # Get supporting scripts
 COPY tool_scripts/airsonic_import.py /tool_scripts/airsonic_import.py

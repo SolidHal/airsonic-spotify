@@ -26,6 +26,10 @@ User gid:    $(id -g abc)
 -------------------------------------
 "
 
+# update tsar
+git -C /tsar pull
+
+# create our working dir
 mkdir -p /import
 
 # take ownership of our working directories and files
